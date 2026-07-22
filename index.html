@@ -3,27 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Random Pinball</title>
-  <meta name="description" content="범퍼가 매판 랜덤하게 배치되는 캔버스 핀볼 게임" />
+  <title>랜덤 이름 뽑기 핀볼</title>
+  <meta name="description" content="이름을 입력하면 위에서 떨어져 장애물을 통과해 순서를 정하는 핀볼 추첨 게임" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="game-wrap">
-    <h1>🎯 Random Pinball</h1>
-
-    <div class="hud">
-      <div class="hud-score">SCORE <span id="score">0</span></div>
-      <div class="hud-balls">BALL <span id="balls">●●●</span></div>
-    </div>
+    <h1>🎯 랜덤 이름 뽑기 핀볼</h1>
 
     <div class="board-frame">
-      <canvas id="board" width="400" height="700"></canvas>
-      <div id="overlay" class="overlay">스페이스바를 눌러 발사하세요</div>
+      <canvas id="board" width="480" height="680"></canvas>
+      <div id="overlay" class="overlay">왼쪽 아래에서 참가자를 추가하고 시작하세요</div>
     </div>
 
-    <p class="controls">
-      ⬅ / Z : 왼쪽 플리퍼 &nbsp;|&nbsp; ➡ / M : 오른쪽 플리퍼 &nbsp;|&nbsp; SPACE : 발사 &nbsp;|&nbsp; R : 다시 시작
-    </p>
+    <div id="rankPanel" class="rank-panel hidden">
+      <h2>결과</h2>
+      <ol id="rankList"></ol>
+      <button id="restartBtn" class="restart-btn">다시 하기</button>
+    </div>
+  </div>
+
+  <div class="setup-panel" id="setupPanel">
+    <h3>참가자 추가</h3>
+    <form id="nameForm">
+      <input id="nameInput" type="text" placeholder="이름 입력" maxlength="10" autocomplete="off" />
+      <button type="submit">추가</button>
+    </form>
+    <ul id="nameList" class="name-list"></ul>
+    <button id="startBtn" class="start-btn" disabled>시작 (최소 2명)</button>
   </div>
 
   <script src="script.js"></script>

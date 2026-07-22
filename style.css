@@ -20,6 +20,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
+  padding-bottom: 15rem;
 }
 
 .game-wrap {
@@ -34,24 +35,6 @@ h1 {
   font-size: 1.5rem;
 }
 
-.hud {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  max-width: 400px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-}
-
-.hud-score span {
-  color: var(--color-accent);
-}
-
-.hud-balls span {
-  color: var(--color-accent);
-  letter-spacing: 0.15em;
-}
-
 .board-frame {
   position: relative;
   border-radius: 12px;
@@ -62,7 +45,7 @@ h1 {
 
 #board {
   display: block;
-  width: min(90vw, 400px);
+  width: min(90vw, 480px);
   height: auto;
   background: #10151c;
 }
@@ -87,9 +70,158 @@ h1 {
   visibility: hidden;
 }
 
-.controls {
+/* Rank panel */
+.rank-panel {
+  width: min(90vw, 480px);
+  background: var(--color-panel);
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+}
+
+.rank-panel.hidden {
+  display: none;
+}
+
+.rank-panel h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.rank-panel ol {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.rank-panel li {
+  margin-bottom: 0.25rem;
+}
+
+.restart-btn {
+  margin-top: 0.75rem;
+  padding: 0.6rem 1.25rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.restart-btn:hover {
+  opacity: 0.9;
+}
+
+/* Setup panel (bottom-left) */
+.setup-panel {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  width: 260px;
+  background: var(--color-panel);
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 1rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.setup-panel.hidden {
+  display: none;
+}
+
+.setup-panel h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
   color: var(--color-text-muted);
+}
+
+#nameForm {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+#nameInput {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  background: #0d1117;
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+#nameForm button {
+  padding: 0.5rem 0.8rem;
+  border: none;
+  border-radius: 6px;
+  background: #2f81f7;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.name-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  max-height: 140px;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.name-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 999px;
+  padding: 0.25rem 0.3rem 0.25rem 0.65rem;
   font-size: 0.85rem;
-  text-align: center;
-  max-width: 400px;
+}
+
+.name-list .remove-btn {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0.15rem 0.35rem;
+}
+
+.name-list .remove-btn:hover {
+  color: var(--color-accent);
+}
+
+.start-btn {
+  width: 100%;
+  padding: 0.65rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.start-btn:disabled {
+  background: #30363d;
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .setup-panel {
+    position: static;
+    width: min(90vw, 480px);
+    margin-top: 1rem;
+  }
+  body {
+    padding-bottom: 1.5rem;
+  }
 }

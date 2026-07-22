@@ -3,259 +3,271 @@ const ctx = canvas.getContext("2d");
 const W = canvas.width;
 const H = canvas.height;
 
-const scoreEl = document.getElementById("score");
-const ballsEl = document.getElementById("balls");
 const overlayEl = document.getElementById("overlay");
+const setupPanel = document.getElementById("setupPanel");
+const nameForm = document.getElementById("nameForm");
+const nameInput = document.getElementById("nameInput");
+const nameListEl = document.getElementById("nameList");
+const startBtn = document.getElementById("startBtn");
+const rankPanel = document.getElementById("rankPanel");
+const rankListEl = document.getElementById("rankList");
+const restartBtn = document.getElementById("restartBtn");
 
-const GRAVITY = 0.4;
+const GRAVITY = 0.35;
 const BALL_R = 9;
-const BUMPER_COLORS = ["#ff5252", "#ffca28", "#42a5f5", "#66bb6a", "#ab47bc"];
+const PEG_R = 6;
+const SPAWN_INTERVAL = 24;
+const BIN_AREA_HEIGHT = 100;
+const COLORS = ["#ff5252", "#ffca28", "#42a5f5", "#66bb6a", "#ab47bc", "#26c6da", "#ff8a65", "#9ccc65"];
 
-const leftFlipper = {
-  pivot: { x: 120, y: 610 },
-  length: 75,
-  restAngle: 0.45,
-  activeAngle: -0.55,
-  angle: 0.45,
-  angularSpeed: 0.35,
-  active: false,
-  thickness: 9,
-};
-
-const rightFlipper = {
-  pivot: { x: 280, y: 610 },
-  length: 75,
-  restAngle: Math.PI - 0.45,
-  activeAngle: Math.PI + 0.55,
-  angle: Math.PI - 0.45,
-  angularSpeed: 0.35,
-  active: false,
-  thickness: 9,
-};
-
-let ball, bumpers, score, balls, state;
+let pendingNames = [];
+let pegs = [];
+let balls = [];
+let bins = [];
+let spawnQueue = [];
+let spawnIndex = 0;
+let spawnTimer = 0;
+let finishedCount = 0;
+let totalPlayers = 0;
+let state = "setup";
 
 function randRange(min, max) {
   return Math.random() * (max - min) + min;
 }
 
-function randInt(min, max) {
-  return Math.floor(randRange(min, max + 1));
-}
+function buildPegs() {
+  pegs = [];
+  const rows = 10;
+  const startY = 90;
+  const rowGap = 40;
+  const margin = 30;
+  const cols = 9;
+  const colGap = (W - margin * 2) / (cols - 1);
 
-function generateBumpers() {
-  const count = randInt(4, 6);
-  const result = [];
-  let attempts = 0;
-
-  while (result.length < count && attempts < 500) {
-    attempts++;
-    const candidate = {
-      x: randRange(50, W - 50),
-      y: randRange(70, 480),
-      r: 18,
-      color: BUMPER_COLORS[randInt(0, BUMPER_COLORS.length - 1)],
-      cooldown: 0,
-      flash: 0,
-    };
-    const overlaps = result.some(
-      (b) => Math.hypot(b.x - candidate.x, b.y - candidate.y) < b.r + candidate.r + 25
-    );
-    if (!overlaps) result.push(candidate);
+  for (let r = 0; r < rows; r++) {
+    const offset = r % 2 === 0 ? 0 : colGap / 2;
+    for (let c = 0; c < cols; c++) {
+      const x = margin + c * colGap + offset;
+      if (x >= margin && x <= W - margin) {
+        pegs.push({ x, y: startY + r * rowGap });
+      }
+    }
   }
-  return result;
 }
 
-function resetBall() {
-  ball = { x: W / 2, y: H - 40, vx: 0, vy: 0, r: BALL_R };
+function renderNameList() {
+  nameListEl.innerHTML = "";
+  pendingNames.forEach((name, i) => {
+    const li = document.createElement("li");
+    const span = document.createElement("span");
+    span.textContent = name;
+    const btn = document.createElement("button");
+    btn.className = "remove-btn";
+    btn.type = "button";
+    btn.textContent = "×";
+    btn.dataset.i = i;
+    btn.setAttribute("aria-label", "삭제");
+    li.appendChild(span);
+    li.appendChild(btn);
+    nameListEl.appendChild(li);
+  });
+  startBtn.disabled = pendingNames.length < 2;
+  startBtn.textContent =
+    pendingNames.length < 2 ? "시작 (최소 2명)" : `시작 (${pendingNames.length}명)`;
 }
 
-function updateHUD() {
-  scoreEl.textContent = score;
-  ballsEl.textContent = "●".repeat(Math.max(balls, 0));
-}
+nameForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const v = nameInput.value.trim();
+  if (!v) return;
+  pendingNames.push(v);
+  nameInput.value = "";
+  renderNameList();
+  nameInput.focus();
+});
 
-function showOverlay(text) {
-  overlayEl.textContent = text;
+nameListEl.addEventListener("click", (e) => {
+  if (e.target.matches(".remove-btn")) {
+    pendingNames.splice(Number(e.target.dataset.i), 1);
+    renderNameList();
+  }
+});
+
+startBtn.addEventListener("click", () => {
+  if (pendingNames.length < 2) return;
+  startGame(pendingNames);
+});
+
+restartBtn.addEventListener("click", () => {
+  balls = [];
+  bins = [];
+  spawnQueue = [];
+  spawnIndex = 0;
+  finishedCount = 0;
+  totalPlayers = 0;
+  state = "setup";
+  rankPanel.classList.add("hidden");
+  setupPanel.classList.remove("hidden");
+  overlayEl.textContent = "왼쪽 아래에서 참가자를 추가하고 시작하세요";
   overlayEl.classList.remove("hidden");
-}
+});
 
-function hideOverlay() {
+function startGame(names) {
+  totalPlayers = names.length;
+  buildPegs();
+  bins = new Array(totalPlayers).fill(null);
+  balls = [];
+  spawnQueue = names.map((n, i) => ({ name: n, color: COLORS[i % COLORS.length] }));
+  spawnIndex = 0;
+  spawnTimer = SPAWN_INTERVAL;
+  finishedCount = 0;
+  state = "dropping";
+  setupPanel.classList.add("hidden");
   overlayEl.classList.add("hidden");
+  rankPanel.classList.remove("hidden");
+  rankListEl.innerHTML = "";
 }
 
-function newGame() {
-  score = 0;
-  balls = 3;
-  bumpers = generateBumpers();
-  resetBall();
-  state = "ready";
-  updateHUD();
-  showOverlay("스페이스바를 눌러 발사하세요");
-}
-
-function launchBall() {
-  ball.vx = randRange(-2, 2);
-  ball.vy = randRange(-17, -13);
-  state = "playing";
-  hideOverlay();
-}
-
-function loseBall() {
-  balls--;
-  updateHUD();
-  if (balls <= 0) {
-    state = "gameover";
-    showOverlay(`게임 오버! 최종 점수: ${score} (R로 다시 시작)`);
-  } else {
-    state = "ready";
-    resetBall();
-    showOverlay("스페이스바를 눌러 발사하세요");
-  }
-}
-
-function updateFlipper(flipper) {
-  const target = flipper.active ? flipper.activeAngle : flipper.restAngle;
-  const diff = target - flipper.angle;
-  const prevAngle = flipper.angle;
-  if (Math.abs(diff) < flipper.angularSpeed) {
-    flipper.angle = target;
-  } else {
-    flipper.angle += Math.sign(diff) * flipper.angularSpeed;
-  }
-  flipper.omega = flipper.angle - prevAngle;
-}
-
-function tipOf(flipper) {
-  return {
-    x: flipper.pivot.x + Math.cos(flipper.angle) * flipper.length,
-    y: flipper.pivot.y + Math.sin(flipper.angle) * flipper.length,
-  };
-}
-
-function closestPointOnSegment(p, a, b) {
-  const abx = b.x - a.x;
-  const aby = b.y - a.y;
-  const lenSq = abx * abx + aby * aby;
-  let t = lenSq === 0 ? 0 : ((p.x - a.x) * abx + (p.y - a.y) * aby) / lenSq;
-  t = Math.max(0, Math.min(1, t));
-  return { x: a.x + abx * t, y: a.y + aby * t };
-}
-
-function handleFlipperCollision(flipper) {
-  const tip = tipOf(flipper);
-  const closest = closestPointOnSegment(ball, flipper.pivot, tip);
-  const dx = ball.x - closest.x;
-  const dy = ball.y - closest.y;
-  const dist = Math.hypot(dx, dy) || 0.001;
-  const minDist = ball.r + flipper.thickness;
-
-  if (dist < minDist) {
-    const nx = dx / dist;
-    const ny = dy / dist;
-
-    ball.x = closest.x + nx * minDist;
-    ball.y = closest.y + ny * minDist;
-
-    const rx = closest.x - flipper.pivot.x;
-    const ry = closest.y - flipper.pivot.y;
-    const pointVx = -flipper.omega * ry;
-    const pointVy = flipper.omega * rx;
-
-    const relVx = ball.vx - pointVx;
-    const relVy = ball.vy - pointVy;
-    const dot = relVx * nx + relVy * ny;
-    const restitution = 1.7;
-
-    const newRelVx = relVx - restitution * dot * nx;
-    const newRelVy = relVy - restitution * dot * ny;
-
-    ball.vx = pointVx + newRelVx;
-    ball.vy = pointVy + newRelVy;
-  }
-}
-
-function handleBumperCollision(bumper) {
-  const dx = ball.x - bumper.x;
-  const dy = ball.y - bumper.y;
-  const dist = Math.hypot(dx, dy) || 0.001;
-  const minDist = ball.r + bumper.r;
-
-  if (dist < minDist) {
-    const nx = dx / dist;
-    const ny = dy / dist;
-
-    ball.x = bumper.x + nx * (minDist + 0.5);
-    ball.y = bumper.y + ny * (minDist + 0.5);
-
-    const dot = ball.vx * nx + ball.vy * ny;
-    ball.vx -= 2 * dot * nx;
-    ball.vy -= 2 * dot * ny;
-    ball.vx += nx * 3;
-    ball.vy += ny * 3;
-
-    const speed = Math.hypot(ball.vx, ball.vy);
-    const kickMin = 7;
-    if (speed < kickMin) {
-      const scale = kickMin / speed;
-      ball.vx *= scale;
-      ball.vy *= scale;
-    }
-
-    if (bumper.cooldown <= 0) {
-      score += randInt(10, 50);
-      updateHUD();
-      bumper.cooldown = 12;
-      bumper.flash = 10;
-    }
-  }
+function addRankEntry(rank, name) {
+  const li = document.createElement("li");
+  li.textContent = `${rank}등: ${name}`;
+  rankListEl.appendChild(li);
 }
 
 function update() {
-  updateFlipper(leftFlipper);
-  updateFlipper(rightFlipper);
+  if (state !== "dropping") return;
 
-  bumpers.forEach((b) => {
-    if (b.cooldown > 0) b.cooldown--;
-    if (b.flash > 0) b.flash--;
+  spawnTimer++;
+  if (spawnIndex < spawnQueue.length && spawnTimer >= SPAWN_INTERVAL) {
+    spawnTimer = 0;
+    const p = spawnQueue[spawnIndex++];
+    balls.push({
+      x: W / 2 + randRange(-15, 15),
+      y: 20,
+      vx: randRange(-1, 1),
+      vy: 0,
+      r: BALL_R,
+      name: p.name,
+      color: p.color,
+    });
+  }
+
+  balls.forEach((b) => {
+    b.vy += GRAVITY;
+    b.x += b.vx;
+    b.y += b.vy;
+
+    if (b.x < b.r) {
+      b.x = b.r;
+      b.vx *= -0.7;
+    } else if (b.x > W - b.r) {
+      b.x = W - b.r;
+      b.vx *= -0.7;
+    }
+    if (b.y < b.r) {
+      b.y = b.r;
+      b.vy *= -0.5;
+    }
+
+    pegs.forEach((peg) => {
+      const dx = b.x - peg.x;
+      const dy = b.y - peg.y;
+      const dist = Math.hypot(dx, dy) || 0.001;
+      const minDist = b.r + PEG_R;
+      if (dist < minDist) {
+        const nx = dx / dist;
+        const ny = dy / dist;
+        b.x = peg.x + nx * minDist;
+        b.y = peg.y + ny * minDist;
+        const dot = b.vx * nx + b.vy * ny;
+        b.vx -= 1.6 * dot * nx;
+        b.vy -= 1.6 * dot * ny;
+        b.vx += randRange(-0.6, 0.6);
+      }
+    });
   });
 
-  if (state !== "playing") return;
+  for (let i = 0; i < balls.length; i++) {
+    for (let j = i + 1; j < balls.length; j++) {
+      const a = balls[i];
+      const b = balls[j];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.hypot(dx, dy) || 0.001;
+      const minDist = a.r + b.r;
+      if (dist < minDist) {
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const overlap = (minDist - dist) / 2;
+        a.x -= nx * overlap;
+        a.y -= ny * overlap;
+        b.x += nx * overlap;
+        b.y += ny * overlap;
 
-  ball.vy += GRAVITY;
-  ball.x += ball.vx;
-  ball.y += ball.vy;
-
-  if (ball.x < ball.r) {
-    ball.x = ball.r;
-    ball.vx *= -0.8;
-  } else if (ball.x > W - ball.r) {
-    ball.x = W - ball.r;
-    ball.vx *= -0.8;
+        const relVx = b.vx - a.vx;
+        const relVy = b.vy - a.vy;
+        const relDot = relVx * nx + relVy * ny;
+        if (relDot < 0) {
+          a.vx += relDot * nx;
+          a.vy += relDot * ny;
+          b.vx -= relDot * nx;
+          b.vy -= relDot * ny;
+        }
+      }
+    }
   }
-  if (ball.y < ball.r) {
-    ball.y = ball.r;
-    ball.vy *= -0.8;
-  }
 
-  bumpers.forEach(handleBumperCollision);
-  handleFlipperCollision(leftFlipper);
-  handleFlipperCollision(rightFlipper);
+  const stillFalling = [];
+  balls.forEach((b) => {
+    if (b.y - b.r > H - 6) {
+      bins[finishedCount] = { name: b.name, color: b.color };
+      finishedCount++;
+      addRankEntry(finishedCount, b.name);
+    } else {
+      stillFalling.push(b);
+    }
+  });
+  balls = stillFalling;
 
-  if (ball.y - ball.r > H) {
-    loseBall();
+  if (finishedCount >= totalPlayers && spawnIndex >= spawnQueue.length) {
+    state = "done";
+    overlayEl.textContent = "완료! 결과를 확인하세요";
+    overlayEl.classList.remove("hidden");
   }
 }
 
-function drawFlipper(flipper) {
-  const tip = tipOf(flipper);
-  ctx.beginPath();
-  ctx.moveTo(flipper.pivot.x, flipper.pivot.y);
-  ctx.lineTo(tip.x, tip.y);
-  ctx.lineCap = "round";
-  ctx.lineWidth = flipper.thickness * 2;
-  ctx.strokeStyle = "#e6edf3";
-  ctx.stroke();
+function drawBins() {
+  const binWidth = W / totalPlayers;
+  const binTop = H - BIN_AREA_HEIGHT;
+
+  ctx.strokeStyle = "#30363d";
+  ctx.lineWidth = 2;
+  for (let i = 0; i <= totalPlayers; i++) {
+    const x = i * binWidth;
+    ctx.beginPath();
+    ctx.moveTo(x, binTop);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < totalPlayers; i++) {
+    const cx = i * binWidth + binWidth / 2;
+    ctx.fillStyle = "#8b949e";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(String(i + 1), cx, binTop - 8);
+
+    const occupant = bins[i];
+    if (occupant) {
+      ctx.beginPath();
+      ctx.arc(cx, H - 28, BALL_R, 0, Math.PI * 2);
+      ctx.fillStyle = occupant.color;
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = "10px sans-serif";
+      ctx.fillText(occupant.name, cx, H - 42);
+    }
+  }
 }
 
 function draw() {
@@ -263,22 +275,27 @@ function draw() {
   ctx.fillStyle = "#10151c";
   ctx.fillRect(0, 0, W, H);
 
-  bumpers.forEach((b) => {
+  pegs.forEach((p) => {
     ctx.beginPath();
-    ctx.arc(b.x, b.y, b.flash > 0 ? b.r + 3 : b.r, 0, Math.PI * 2);
-    ctx.fillStyle = b.color;
-    ctx.globalAlpha = b.flash > 0 ? 1 : 0.85;
+    ctx.arc(p.x, p.y, PEG_R, 0, Math.PI * 2);
+    ctx.fillStyle = "#3a4552";
     ctx.fill();
-    ctx.globalAlpha = 1;
   });
 
-  drawFlipper(leftFlipper);
-  drawFlipper(rightFlipper);
+  if (state !== "setup") {
+    drawBins();
+  }
 
-  ctx.beginPath();
-  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
-  ctx.fillStyle = "#f5f5f5";
-  ctx.fill();
+  balls.forEach((b) => {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fillStyle = b.color;
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = "10px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(b.name, b.x, b.y - b.r - 4);
+  });
 }
 
 function loop() {
@@ -287,20 +304,5 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-window.addEventListener("keydown", (e) => {
-  if (["ArrowLeft", "ArrowRight", "Space", "KeyZ", "KeyM"].includes(e.code)) {
-    e.preventDefault();
-  }
-  if (e.code === "ArrowLeft" || e.code === "KeyZ") leftFlipper.active = true;
-  if (e.code === "ArrowRight" || e.code === "KeyM") rightFlipper.active = true;
-  if (e.code === "Space" && state === "ready") launchBall();
-  if (e.code === "KeyR") newGame();
-});
-
-window.addEventListener("keyup", (e) => {
-  if (e.code === "ArrowLeft" || e.code === "KeyZ") leftFlipper.active = false;
-  if (e.code === "ArrowRight" || e.code === "KeyM") rightFlipper.active = false;
-});
-
-newGame();
+renderNameList();
 loop();
