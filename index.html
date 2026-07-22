@@ -3,109 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vacation Guide | 여행지 추천</title>
-  <meta name="description" content="전 세계 여행지를 추천하고 소개하는 가이드 사이트" />
+  <title>Random Pinball</title>
+  <meta name="description" content="범퍼가 매판 랜덤하게 배치되는 캔버스 핀볼 게임" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="site-header">
-    <div class="container header-inner">
-      <a href="#" class="logo">Vacation<span>Guide</span></a>
-      <nav>
-        <ul class="nav-links">
-          <li><a href="#destinations">여행지</a></li>
-          <li><a href="#tips">여행 팁</a></li>
-          <li><a href="#about">소개</a></li>
-          <li><a href="#contact">제휴문의</a></li>
-        </ul>
-      </nav>
+  <div class="game-wrap">
+    <h1>🎯 Random Pinball</h1>
+
+    <div class="hud">
+      <div class="hud-score">SCORE <span id="score">0</span></div>
+      <div class="hud-balls">BALL <span id="balls">●●●</span></div>
     </div>
-  </header>
 
-  <section class="hero">
-    <div class="container hero-inner">
-      <h1>다음 휴가는 어디로 떠나볼까요?</h1>
-      <p>엄선된 여행지와 실용적인 팁으로 완벽한 여행을 계획하세요.</p>
-      <form class="search-box" onsubmit="return false;">
-        <input type="text" placeholder="여행지를 검색해보세요 (예: 제주도, 오사카)" />
-        <button type="submit">검색</button>
-      </form>
+    <div class="board-frame">
+      <canvas id="board" width="400" height="700"></canvas>
+      <div id="overlay" class="overlay">스페이스바를 눌러 발사하세요</div>
     </div>
-  </section>
 
-  <main class="container">
-    <section id="destinations" class="section">
-      <h2>추천 여행지</h2>
-      <div class="card-grid">
-        <article class="card">
-          <div class="card-img placeholder">🏝️</div>
-          <div class="card-body">
-            <h3>여행지 이름</h3>
-            <p>이곳에 여행지에 대한 간단한 소개 문구를 작성하세요.</p>
-          </div>
-        </article>
-        <article class="card">
-          <div class="card-img placeholder">⛰️</div>
-          <div class="card-body">
-            <h3>여행지 이름</h3>
-            <p>이곳에 여행지에 대한 간단한 소개 문구를 작성하세요.</p>
-          </div>
-        </article>
-        <article class="card">
-          <div class="card-img placeholder">🏯</div>
-          <div class="card-body">
-            <h3>여행지 이름</h3>
-            <p>이곳에 여행지에 대한 간단한 소개 문구를 작성하세요.</p>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section id="tips" class="section">
-      <h2>여행 팁</h2>
-      <ul class="tip-list">
-        <li>짐은 최소한으로, 필수품 위주로 챙기세요.</li>
-        <li>현지 통화와 결제 수단을 미리 확인하세요.</li>
-        <li>여행자 보험 가입을 잊지 마세요.</li>
-      </ul>
-    </section>
-
-    <section id="about" class="section">
-      <h2>소개</h2>
-      <p>이 사이트는 여행지 추천과 가이드를 제공하는 개인 프로젝트입니다.</p>
-    </section>
-
-    <section id="contact" class="section">
-      <h2>제휴문의</h2>
-      <p class="section-intro">광고, 협업, 제휴 관련 문의를 남겨주시면 빠르게 답변드리겠습니다.</p>
-      <form class="contact-form" action="https://formspree.io/f/xbdnajgd" method="POST">
-        <div class="form-row">
-          <label for="name">이름</label>
-          <input type="text" id="name" name="name" required />
-        </div>
-        <div class="form-row">
-          <label for="email">이메일</label>
-          <input type="email" id="email" name="email" required />
-        </div>
-        <div class="form-row">
-          <label for="company">회사/브랜드명</label>
-          <input type="text" id="company" name="company" />
-        </div>
-        <div class="form-row">
-          <label for="message">문의 내용</label>
-          <textarea id="message" name="message" rows="5" required></textarea>
-        </div>
-        <input type="text" name="_gotcha" style="display: none" tabindex="-1" autocomplete="off" />
-        <button type="submit">문의 보내기</button>
-      </form>
-    </section>
-  </main>
-
-  <footer class="site-footer">
-    <div class="container">
-      <p>&copy; 2026 Vacation Guide. All rights reserved.</p>
-    </div>
-  </footer>
+    <p class="controls">
+      ⬅ / Z : 왼쪽 플리퍼 &nbsp;|&nbsp; ➡ / M : 오른쪽 플리퍼 &nbsp;|&nbsp; SPACE : 발사 &nbsp;|&nbsp; R : 다시 시작
+    </p>
+  </div>
 
   <script src="script.js"></script>
 </body>
