@@ -4,33 +4,32 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>랜덤 이름 뽑기 핀볼</title>
-  <meta name="description" content="이름을 입력하면 위에서 떨어져 장애물을 통과해 순서를 정하는 핀볼 추첨 게임" />
+  <meta name="description" content="핀볼 맵을 스크롤로 내려가며 1등을 따라가는 랜덤 이름 추첨 게임" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="game-wrap">
+  <canvas id="board"></canvas>
+
+  <div id="overlay" class="overlay">왼쪽 아래에서 참가자를 추가하고 시작하세요</div>
+
+  <header class="title-bar">
     <h1>🎯 랜덤 이름 뽑기 핀볼</h1>
+  </header>
 
-    <div class="board-frame">
-      <canvas id="board" width="480" height="680"></canvas>
-      <div id="overlay" class="overlay">왼쪽 아래에서 참가자를 추가하고 시작하세요</div>
-    </div>
-
-    <div id="rankPanel" class="rank-panel hidden">
-      <h2>결과</h2>
-      <ol id="rankList"></ol>
-      <button id="restartBtn" class="restart-btn">다시 하기</button>
-    </div>
+  <div id="rankPanel" class="rank-panel hidden">
+    <h2>결과</h2>
+    <ol id="rankList"></ol>
+    <button id="restartBtn" class="restart-btn">다시 하기</button>
   </div>
 
   <div class="setup-panel" id="setupPanel">
-    <h3>참가자 추가</h3>
+    <h3>참가자 추가 (1~50명)</h3>
     <form id="nameForm">
       <input id="nameInput" type="text" placeholder="이름 입력" maxlength="10" autocomplete="off" />
       <button type="submit">추가</button>
     </form>
     <ul id="nameList" class="name-list"></ul>
-    <button id="startBtn" class="start-btn" disabled>시작 (최소 2명)</button>
+    <button id="startBtn" class="start-btn" disabled>시작 (최소 1명)</button>
   </div>
 
   <script src="script.js"></script>

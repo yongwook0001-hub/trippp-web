@@ -1,7 +1,5 @@
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
-const W = canvas.width;
-const H = canvas.height;
 
 const overlayEl = document.getElementById("overlay");
 const setupPanel = document.getElementById("setupPanel");
@@ -17,13 +15,21 @@ const GRAVITY = 0.35;
 const BALL_R = 9;
 const PEG_R = 6;
 const SPAWN_INTERVAL = 24;
-const BIN_AREA_HEIGHT = 100;
+const MIN_PLAYERS = 1;
+const MAX_PLAYERS = 50;
+const BASE_HEIGHT = 3200;
+const HEIGHT_PER_PLAYER = 24;
+const FUNNEL_HEIGHT = 380;
+const EXIT_GAP = 70;
 const COLORS = ["#ff5252", "#ffca28", "#42a5f5", "#66bb6a", "#ab47bc", "#26c6da", "#ff8a65", "#9ccc65"];
+
+let W = window.innerWidth;
+let BOARD_H = BASE_HEIGHT;
 
 let pendingNames = [];
 let pegs = [];
+let windmills = [];
 let balls = [];
-let bins = [];
 let spawnQueue = [];
 let spawnIndex = 0;
 let spawnTimer = 0;
@@ -35,23 +41,67 @@ function randRange(min, max) {
   return Math.random() * (max - min) + min;
 }
 
+function sizeCanvas(playerCount) {
+  W = window.innerWidth;
+  BOARD_H = BASE_HEIGHT + Math.min(playerCount, MAX_PLAYERS) * HEIGHT_PER_PLAYER;
+  canvas.width = W;
+  canvas.height = BOARD_H;
+}
+
+function nearWindmill(y) {
+  return windmills.some((w) => Math.abs(w.y - y) < 90);
+}
+
+function buildWindmills() {
+  windmills = [];
+  const fieldBottom = BOARD_H - FUNNEL_HEIGHT;
+  let y = 480;
+  let side = 0;
+  while (y < fieldBottom - 200) {
+    const x = side % 2 === 0 ? W * 0.3 : W * 0.7;
+    windmills.push({
+      x,
+      y,
+      armLength: 75,
+      angle: Math.random() * Math.PI * 2,
+      speed: (Math.random() < 0.5 ? -1 : 1) * randRange(0.03, 0.05),
+      thickness: 8,
+    });
+    side++;
+    y += 550;
+  }
+}
+
 function buildPegs() {
   pegs = [];
-  const rows = 10;
-  const startY = 90;
-  const rowGap = 40;
-  const margin = 30;
-  const cols = 9;
+  const margin = 40;
+  const rowGap = 55;
+  const targetColGap = 70;
+  const cols = Math.max(5, Math.round((W - margin * 2) / targetColGap) + 1);
   const colGap = (W - margin * 2) / (cols - 1);
+  const fieldBottom = BOARD_H - FUNNEL_HEIGHT;
 
-  for (let r = 0; r < rows; r++) {
-    const offset = r % 2 === 0 ? 0 : colGap / 2;
+  for (let y = 150; y < fieldBottom; y += rowGap) {
+    if (nearWindmill(y)) continue;
+    const rowIndex = Math.round((y - 150) / rowGap);
+    const offset = rowIndex % 2 === 0 ? 0 : colGap / 2;
     for (let c = 0; c < cols; c++) {
       const x = margin + c * colGap + offset;
       if (x >= margin && x <= W - margin) {
-        pegs.push({ x, y: startY + r * rowGap });
+        pegs.push({ x, y });
       }
     }
+  }
+
+  const funnelStartY = fieldBottom;
+  const funnelEndY = BOARD_H - 20;
+  const steps = 20;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const y = funnelStartY + t * (funnelEndY - funnelStartY);
+    const leftX = margin + t * (W / 2 - EXIT_GAP / 2 - margin);
+    pegs.push({ x: leftX, y });
+    pegs.push({ x: W - leftX, y });
   }
 }
 
@@ -71,15 +121,19 @@ function renderNameList() {
     li.appendChild(btn);
     nameListEl.appendChild(li);
   });
-  startBtn.disabled = pendingNames.length < 2;
-  startBtn.textContent =
-    pendingNames.length < 2 ? "시작 (최소 2명)" : `시작 (${pendingNames.length}명)`;
+  const count = pendingNames.length;
+  startBtn.disabled = count < MIN_PLAYERS;
+  startBtn.textContent = count < MIN_PLAYERS ? "시작 (최소 1명)" : `시작 (${count}명)`;
 }
 
 nameForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const v = nameInput.value.trim();
   if (!v) return;
+  if (pendingNames.length >= MAX_PLAYERS) {
+    alert(`참가자는 최대 ${MAX_PLAYERS}명까지 추가할 수 있습니다.`);
+    return;
+  }
   pendingNames.push(v);
   nameInput.value = "";
   renderNameList();
@@ -94,13 +148,12 @@ nameListEl.addEventListener("click", (e) => {
 });
 
 startBtn.addEventListener("click", () => {
-  if (pendingNames.length < 2) return;
+  if (pendingNames.length < MIN_PLAYERS) return;
   startGame(pendingNames);
 });
 
 restartBtn.addEventListener("click", () => {
   balls = [];
-  bins = [];
   spawnQueue = [];
   spawnIndex = 0;
   finishedCount = 0;
@@ -110,12 +163,17 @@ restartBtn.addEventListener("click", () => {
   setupPanel.classList.remove("hidden");
   overlayEl.textContent = "왼쪽 아래에서 참가자를 추가하고 시작하세요";
   overlayEl.classList.remove("hidden");
+  sizeCanvas(pendingNames.length);
+  buildWindmills();
+  buildPegs();
+  window.scrollTo(0, 0);
 });
 
 function startGame(names) {
   totalPlayers = names.length;
+  sizeCanvas(totalPlayers);
+  buildWindmills();
   buildPegs();
-  bins = new Array(totalPlayers).fill(null);
   balls = [];
   spawnQueue = names.map((n, i) => ({ name: n, color: COLORS[i % COLORS.length] }));
   spawnIndex = 0;
@@ -126,6 +184,7 @@ function startGame(names) {
   overlayEl.classList.add("hidden");
   rankPanel.classList.remove("hidden");
   rankListEl.innerHTML = "";
+  window.scrollTo(0, 0);
 }
 
 function addRankEntry(rank, name) {
@@ -134,8 +193,57 @@ function addRankEntry(rank, name) {
   rankListEl.appendChild(li);
 }
 
+function closestPointOnSegment(p, a, b) {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const lenSq = abx * abx + aby * aby;
+  let t = lenSq === 0 ? 0 : ((p.x - a.x) * abx + (p.y - a.y) * aby) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return { x: a.x + abx * t, y: a.y + aby * t };
+}
+
+function handleWindmillCollision(ball, w) {
+  const dx1 = Math.cos(w.angle) * w.armLength;
+  const dy1 = Math.sin(w.angle) * w.armLength;
+  const p1 = { x: w.x - dx1, y: w.y - dy1 };
+  const p2 = { x: w.x + dx1, y: w.y + dy1 };
+  const closest = closestPointOnSegment(ball, p1, p2);
+  const dx = ball.x - closest.x;
+  const dy = ball.y - closest.y;
+  const dist = Math.hypot(dx, dy) || 0.001;
+  const minDist = ball.r + w.thickness;
+
+  if (dist < minDist) {
+    const nx = dx / dist;
+    const ny = dy / dist;
+    ball.x = closest.x + nx * minDist;
+    ball.y = closest.y + ny * minDist;
+
+    const rx = closest.x - w.x;
+    const ry = closest.y - w.y;
+    const pointVx = -w.speed * ry;
+    const pointVy = w.speed * rx;
+
+    const relVx = ball.vx - pointVx;
+    const relVy = ball.vy - pointVy;
+    const dot = relVx * nx + relVy * ny;
+    const restitution = 1.6;
+
+    ball.vx = pointVx + (relVx - restitution * dot * nx);
+    ball.vy = pointVy + (relVy - restitution * dot * ny);
+  }
+}
+
+function updateWindmills() {
+  windmills.forEach((w) => {
+    w.angle += w.speed;
+  });
+}
+
 function update() {
   if (state !== "dropping") return;
+
+  updateWindmills();
 
   spawnTimer++;
   if (spawnIndex < spawnQueue.length && spawnTimer >= SPAWN_INTERVAL) {
@@ -185,6 +293,8 @@ function update() {
         b.vx += randRange(-0.6, 0.6);
       }
     });
+
+    windmills.forEach((w) => handleWindmillCollision(b, w));
   });
 
   for (let i = 0; i < balls.length; i++) {
@@ -219,8 +329,7 @@ function update() {
 
   const stillFalling = [];
   balls.forEach((b) => {
-    if (b.y - b.r > H - 6) {
-      bins[finishedCount] = { name: b.name, color: b.color };
+    if (b.y - b.r > BOARD_H - 6) {
       finishedCount++;
       addRankEntry(finishedCount, b.name);
     } else {
@@ -236,44 +345,37 @@ function update() {
   }
 }
 
-function drawBins() {
-  const binWidth = W / totalPlayers;
-  const binTop = H - BIN_AREA_HEIGHT;
-
-  ctx.strokeStyle = "#30363d";
-  ctx.lineWidth = 2;
-  for (let i = 0; i <= totalPlayers; i++) {
-    const x = i * binWidth;
-    ctx.beginPath();
-    ctx.moveTo(x, binTop);
-    ctx.lineTo(x, H);
-    ctx.stroke();
+function updateScroll() {
+  if (state !== "dropping") return;
+  let leaderY = 0;
+  if (balls.length > 0) {
+    leaderY = Math.max(...balls.map((b) => b.y));
   }
+  const target = Math.max(0, leaderY - window.innerHeight * 0.4);
+  window.scrollTo(0, target);
+}
 
-  for (let i = 0; i < totalPlayers; i++) {
-    const cx = i * binWidth + binWidth / 2;
-    ctx.fillStyle = "#8b949e";
-    ctx.font = "11px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(String(i + 1), cx, binTop - 8);
+function drawWindmill(w) {
+  const dx = Math.cos(w.angle) * w.armLength;
+  const dy = Math.sin(w.angle) * w.armLength;
+  ctx.beginPath();
+  ctx.moveTo(w.x - dx, w.y - dy);
+  ctx.lineTo(w.x + dx, w.y + dy);
+  ctx.lineCap = "round";
+  ctx.lineWidth = w.thickness * 2;
+  ctx.strokeStyle = "#f2a900";
+  ctx.stroke();
 
-    const occupant = bins[i];
-    if (occupant) {
-      ctx.beginPath();
-      ctx.arc(cx, H - 28, BALL_R, 0, Math.PI * 2);
-      ctx.fillStyle = occupant.color;
-      ctx.fill();
-      ctx.fillStyle = "#fff";
-      ctx.font = "10px sans-serif";
-      ctx.fillText(occupant.name, cx, H - 42);
-    }
-  }
+  ctx.beginPath();
+  ctx.arc(w.x, w.y, 6, 0, Math.PI * 2);
+  ctx.fillStyle = "#c77c00";
+  ctx.fill();
 }
 
 function draw() {
-  ctx.clearRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, BOARD_H);
   ctx.fillStyle = "#10151c";
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, W, BOARD_H);
 
   pegs.forEach((p) => {
     ctx.beginPath();
@@ -282,9 +384,12 @@ function draw() {
     ctx.fill();
   });
 
-  if (state !== "setup") {
-    drawBins();
-  }
+  windmills.forEach(drawWindmill);
+
+  ctx.fillStyle = "#8b949e";
+  ctx.font = "13px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("출구", W / 2, BOARD_H - 4);
 
   balls.forEach((b) => {
     ctx.beginPath();
@@ -301,8 +406,12 @@ function draw() {
 function loop() {
   update();
   draw();
+  updateScroll();
   requestAnimationFrame(loop);
 }
 
 renderNameList();
+sizeCanvas(0);
+buildWindmills();
+buildPegs();
 loop();
